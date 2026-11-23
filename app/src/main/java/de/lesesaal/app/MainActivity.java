@@ -143,12 +143,19 @@ public class MainActivity extends Activity {
         String h = u.getHost();
         if (h == null) return true;
         return h.equals("claude.ai") || h.endsWith(".claude.ai") || h.endsWith("anthropic.com")
-            || h.endsWith("claudeusercontent.com") || h.endsWith("claude.com")
-            || h.endsWith("accounts.google.com") || h.endsWith("appleid.apple.com");
+            || h.endsWith("claudeusercontent.com") || h.endsWith("claude.com");
     }
 
     private boolean handleUrl(Uri u) {
         String scheme = u.getScheme();
+        String host = u.getHost() == null ? "" : u.getHost();
+        if (host.endsWith("accounts.google.com") || host.endsWith("appleid.apple.com")) {
+            runOnUiThread(() -> new android.app.AlertDialog.Builder(MainActivity.this)
+                .setTitle("Bitte mit E-Mail anmelden")
+                .setMessage("Google und Apple erlauben die Anmeldung in App-Fenstern nicht.\n\n1. Gib auf der Login-Seite deine E-Mail-Adresse ein.\n2. Halte in der E-Mail von Anthropic den Login-Link gedrückt → „Link kopieren“.\n3. Tippe hier unten auf „Login-Link einfügen“.")
+                .setPositiveButton("Verstanden", null).show());
+            return true;
+        }
         if ("http".equals(scheme) || "https".equals(scheme)) {
             if (isInternal(u)) return false;
             openExternal(u);
@@ -164,7 +171,7 @@ public class MainActivity extends Activity {
     }
 
     private void updateLoginButton(String url) {
-        boolean login = url != null && url.contains("claude.ai/login");
+        boolean login = url != null && (url.contains("claude.ai/login") || url.contains("claude.ai/magic-link") || url.contains("claude.ai/onboarding"));
         loginBtn.setVisibility(login ? View.VISIBLE : View.GONE);
     }
 
