@@ -22,8 +22,19 @@ jobs:
           gradle-version: '8.7'
       - name: APK bauen
         run: gradle :app:assembleDebug --no-daemon
-      - name: APK umbenennen
-        run: cp app/build/outputs/apk/debug/app-debug.apk Lesesaal.apk
+      - name: APK signieren (eigener Schlüssel, falls hinterlegt)
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > ks.jks
+            BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+            $BT/apksigner sign --ks ks.jks --ks-pass env:KEYSTORE_PASSWORD --out Lesesaal.apk app/build/outputs/apk/debug/app-debug.apk
+            rm ks.jks
+          else
+            cp app/build/outputs/apk/debug/app-debug.apk Lesesaal.apk
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: Lesesaal-APK
