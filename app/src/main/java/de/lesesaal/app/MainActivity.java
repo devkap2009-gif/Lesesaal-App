@@ -46,20 +46,20 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         Window w = getWindow();
-        w.setStatusBarColor(Color.parseColor("#04060B"));
-        w.setNavigationBarColor(Color.parseColor("#04060B"));
+        w.setStatusBarColor(Color.parseColor("#000000"));
+        w.setNavigationBarColor(Color.parseColor("#000000"));
 
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.parseColor("#04060B"));
+        root.setBackgroundColor(Color.parseColor("#000000"));
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#04060B"));
+        web.setBackgroundColor(Color.parseColor("#000000"));
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
 
         loginBtn = new Button(this);
         loginBtn.setText("Login-Link einfügen");
         loginBtn.setAllCaps(false);
-        loginBtn.setTextColor(Color.parseColor("#050913"));
-        loginBtn.setBackgroundColor(Color.parseColor("#A9C0FF"));
+        loginBtn.setTextColor(Color.parseColor("#000000"));
+        loginBtn.setBackgroundColor(Color.parseColor("#FFFFFF"));
         loginBtn.setVisibility(View.GONE);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         lp.bottomMargin = (int) (32 * getResources().getDisplayMetrics().density);
