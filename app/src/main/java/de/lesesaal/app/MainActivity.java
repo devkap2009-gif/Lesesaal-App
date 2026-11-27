@@ -14,6 +14,11 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Message;
 import android.provider.MediaStore;
+import android.speech.RecognizerIntent;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
+import java.util.ArrayList;
+import java.util.Locale;
 import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
@@ -38,6 +43,12 @@ import java.io.OutputStream;
 public class MainActivity extends Activity {
     private static final String START = "https://claude.ai/artifact/VbXGUpKKowM9LNwWgq1nKC";
     private static final int FILE_REQ = 41;
+    private static final int VOICE_REQ = 42;
+    private volatile String voiceState = "idle";
+    private volatile String voiceText = "";
+    private TextToSpeech tts;
+    private volatile boolean ttsReady = false;
+    private volatile boolean ttsBusy = false;
     private WebView web;
     private Button loginBtn;
     private ValueCallback<Uri[]> fileCb;
@@ -45,6 +56,17 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        tts = new TextToSpeech(this, st -> {
+            if (st == TextToSpeech.SUCCESS) {
+                tts.setLanguage(Locale.GERMANY);
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override public void onStart(String id) { ttsBusy = true; }
+                    @Override public void onDone(String id) { if (!tts.isSpeaking()) ttsBusy = false; }
+                    @Override public void onError(String id) { ttsBusy = false; }
+                });
+                ttsReady = true;
+            }
+        });
         Window w = getWindow();
         w.setStatusBarColor(Color.parseColor("#000000"));
         w.setNavigationBarColor(Color.parseColor("#000000"));
@@ -193,6 +215,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == VOICE_REQ) {
+            ArrayList<String> r = (res == RESULT_OK && data != null) ? data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS) : null;
+            if (r != null && !r.isEmpty()) { voiceText = r.get(0); voiceState = "done"; }
+            else { voiceText = ""; voiceState = "cancel"; }
+            return;
+        }
         if (req != FILE_REQ || fileCb == null) return;
         Uri[] result = null;
         if (res == RESULT_OK && data != null) {
@@ -224,7 +252,44 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().flush();
     }
 
+    @Override
+    protected void onDestroy() {
+        if (tts != null) { tts.stop(); tts.shutdown(); }
+        super.onDestroy();
+    }
+
     private class Bridge {
+        @JavascriptInterface
+        public String voiceCaps() { return "{\"listen\":true,\"speak\":" + ttsReady + "}"; }
+        @JavascriptInterface
+        public void listen(String lang) {
+            voiceText = ""; voiceState = "listening";
+            runOnUiThread(() -> {
+                Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, (lang == null || lang.isEmpty()) ? "de-DE" : lang);
+                i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Sprich mit deinem Mentor");
+                try { startActivityForResult(i, VOICE_REQ); }
+                catch (ActivityNotFoundException e) { voiceState = "unavailable"; }
+            });
+        }
+        @JavascriptInterface
+        public String voiceResult() {
+            String st = voiceState;
+            if (st.equals("done") || st.equals("cancel") || st.equals("unavailable")) { voiceState = "idle"; }
+            return "{\"state\":\"" + st + "\",\"text\":" + org.json.JSONObject.quote(voiceText) + "}";
+        }
+        @JavascriptInterface
+        public void speak(String text) {
+            if (!ttsReady) return;
+            ttsBusy = true;
+            Bundle b = new Bundle();
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, b, "ls" + System.currentTimeMillis());
+        }
+        @JavascriptInterface
+        public boolean speaking() { return ttsReady && (ttsBusy || tts.isSpeaking()); }
+        @JavascriptInterface
+        public void stopSpeak() { if (tts != null) { tts.stop(); ttsBusy = false; } }
         @JavascriptInterface
         public void save(String name, String mime, String b64) {
             try {
